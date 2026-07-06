@@ -17,7 +17,7 @@
 - 休息提醒：按固定间隔弹出温馨提醒，帮助你从长时间工作里停一下。
 - 语音输入：使用 macOS 语音识别把中英文夹杂的口述内容转成待办。
 - 隐身模式：右键或长按小Q选择隐身，之后可从菜单栏入口恢复。
-- 设置：支持淡绿色/淡粉色主题，以及中文/英文面板语言。
+- 设置：支持薄荷绿/樱花粉主题，以及中文/英文面板语言。
 - 本地保存：待办数据保存在本机，不依赖后端服务。
 
 ### 安装
@@ -135,7 +135,7 @@ MacDesktopBuddy is a small macOS desktop companion for todos, task reminders, an
 - Break reminders: warm rest prompts at a configurable interval.
 - Voice input: macOS Speech recognition for Chinese-first dictation with mixed English terms.
 - Hide mode: hide Q from the desktop via right-click or long-press, then restore it from the menu bar.
-- Settings: Soft Green / Soft Pink themes and Chinese / English panel language.
+- Settings: Mint Green / Sakura Pink themes and Chinese / English panel language.
 - Local-first storage: todos are stored locally with no backend service.
 
 ### Install

@@ -8,10 +8,10 @@ enum AppTheme: String, CaseIterable, Identifiable {
 
     func displayName(language: AppLanguage) -> String {
         switch (self, language) {
-        case (.green, .chinese): return "淡绿色"
-        case (.green, .english): return "Soft Green"
-        case (.pink, .chinese): return "淡粉色"
-        case (.pink, .english): return "Soft Pink"
+        case (.green, .chinese): return "薄荷绿"
+        case (.green, .english): return "Mint Green"
+        case (.pink, .chinese): return "樱花粉"
+        case (.pink, .english): return "Sakura Pink"
         }
     }
 }

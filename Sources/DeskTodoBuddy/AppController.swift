@@ -165,6 +165,7 @@ final class AppController: NSObject, NSApplicationDelegate {
 
         notificationScheduler.requestAuthorization()
         notificationScheduler.schedule(items: store.items)
+        observeWorkspaceSessionChanges()
 
         createIconWindow()
         createTodoPanel()
@@ -176,7 +177,28 @@ final class AppController: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        NSWorkspace.shared.notificationCenter.removeObserver(self)
         speechCleanup()
+    }
+
+    private func observeWorkspaceSessionChanges() {
+        let center = NSWorkspace.shared.notificationCenter
+        center.addObserver(
+            self,
+            selector: #selector(resetBreakTimerAfterSessionResume),
+            name: NSWorkspace.sessionDidBecomeActiveNotification,
+            object: nil
+        )
+        center.addObserver(
+            self,
+            selector: #selector(resetBreakTimerAfterSessionResume),
+            name: NSWorkspace.screensDidWakeNotification,
+            object: nil
+        )
+    }
+
+    @objc private func resetBreakTimerAfterSessionResume() {
+        reminders.resetBreakTimer()
     }
 
     func toggleTodoPanel() {

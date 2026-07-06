@@ -88,7 +88,6 @@ struct FloatingIconView: View {
             .frame(width: 86, height: 86)
             .scaleEffect(isHovering ? 1.05 : 1.0)
             .offset(y: isBobbing ? -5 : 3)
-            .shadow(color: .black.opacity(0.25), radius: 14, y: 8)
         }
         .frame(width: 104, height: 104)
         .contentShape(Rectangle())
