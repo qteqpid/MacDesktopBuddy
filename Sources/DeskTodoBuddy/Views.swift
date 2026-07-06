@@ -693,7 +693,7 @@ struct ReminderBubbleView: View {
 
                 Spacer(minLength: 0)
             }
-            .padding(.trailing, 26)
+            .padding(.trailing, 28)
 
             Button(action: onClose) {
                 Image(systemName: "xmark")
@@ -705,6 +705,8 @@ struct ReminderBubbleView: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel(AppStrings.close(settings.language))
+            .padding(.top, 6)
+            .padding(.trailing, 6)
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 9)

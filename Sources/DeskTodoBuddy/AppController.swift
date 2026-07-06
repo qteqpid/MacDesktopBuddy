@@ -515,7 +515,7 @@ final class AppController: NSObject, NSApplicationDelegate {
         panel.orderFrontRegardless()
 
         reminderBubbleDismissTask = Task { [weak self] in
-            try? await Task.sleep(nanoseconds: 8_000_000_000)
+            try? await Task.sleep(nanoseconds: 20_000_000_000)
             guard !Task.isCancelled else { return }
             await MainActor.run {
                 self?.reminderBubblePanel?.orderOut(nil)
