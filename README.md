@@ -4,7 +4,7 @@
 
 [中文](#中文) · [English](#english)
 
-![MacDesktopBuddy icon](Resources/BuddyIcon.png)
+<img src="Resources/BuddyIcon.png" alt="MacDesktopBuddy icon" width="160">
 
 ## 中文
 
@@ -22,7 +22,13 @@
 
 ### 安装
 
-从本仓库构建出的 DMG 在：
+下载最新的 DMG release：
+
+```text
+https://github.com/qteqpid/MacDesktopBuddy/releases/latest
+```
+
+如果是从源码本地构建，生成的 DMG 在：
 
 ```text
 dist/MacDesktopBuddy.dmg
@@ -140,7 +146,13 @@ MacDesktopBuddy is a small macOS desktop companion for todos, task reminders, an
 
 ### Install
 
-The generated DMG lives at:
+Download the latest DMG release:
+
+```text
+https://github.com/qteqpid/MacDesktopBuddy/releases/latest
+```
+
+When building from source locally, the generated DMG lives at:
 
 ```text
 dist/MacDesktopBuddy.dmg
