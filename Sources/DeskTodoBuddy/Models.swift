@@ -31,8 +31,38 @@ struct BuddyMessage: Identifiable, Equatable {
     let createdAt = Date()
 }
 
+enum ReminderTiming {
+    static let taskReminderGracePeriod: TimeInterval = 2 * 60
+
+    static func normalizedBreakInterval(_ minutes: Int) -> Int {
+        min(max(minutes, 15), 120)
+    }
+
+    static func customReminderDate(from selection: Date, now: Date = Date(), calendar: Calendar = .current) -> Date {
+        let rounded = selection.removingSeconds(calendar: calendar)
+        guard rounded <= now else { return rounded }
+        return calendar.date(byAdding: .minute, value: 1, to: now.removingSeconds(calendar: calendar)) ?? selection
+    }
+
+    static func shouldDeliverTaskReminder(now: Date, reminderDate: Date, gracePeriod: TimeInterval = taskReminderGracePeriod) -> Bool {
+        reminderDate <= now && now.timeIntervalSince(reminderDate) <= gracePeriod
+    }
+}
+
+extension Date {
+    func removingSeconds(calendar: Calendar = .current) -> Date {
+        let components = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: self)
+        return calendar.date(from: components) ?? self
+    }
+}
+
 enum AppPaths {
+    static var supportDirectoryOverride: URL?
+
     static var supportDirectory: URL {
+        if let supportDirectoryOverride {
+            return supportDirectoryOverride
+        }
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Library/Application Support")
         return base.appendingPathComponent("DeskTodoBuddy", isDirectory: true)

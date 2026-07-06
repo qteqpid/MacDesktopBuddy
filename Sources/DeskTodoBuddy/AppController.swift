@@ -6,13 +6,18 @@ final class BuddyPanel: NSPanel {
     override var canBecomeMain: Bool { true }
 }
 
+private func makeLightHostingView<Content: View>(_ rootView: Content) -> NSHostingView<AnyView> {
+    NSHostingView(rootView: AnyView(rootView.preferredColorScheme(.light)))
+}
+
 final class FloatingIconHostingView: NSHostingView<FloatingIconView> {
     private var dragIcon: (CGSize) -> Void = { _ in }
-    private var finishIconDrag: (CGSize) -> Void = { _ in }
+    private var finishIconDrag: (CGSize, Bool) -> Void = { _, _ in }
     private var showIconMenu: (NSPoint) -> Void = { _ in }
     private var mouseDownLocation: NSPoint?
     private var longPressWorkItem: DispatchWorkItem?
     private var shouldIgnoreMouseUp = false
+    private var didDragIcon = false
 
     override var isOpaque: Bool { false }
 
@@ -24,7 +29,7 @@ final class FloatingIconHostingView: NSHostingView<FloatingIconView> {
     init(
         rootView: FloatingIconView,
         dragIcon: @escaping (CGSize) -> Void,
-        finishIconDrag: @escaping (CGSize) -> Void,
+        finishIconDrag: @escaping (CGSize, Bool) -> Void,
         showIconMenu: @escaping (NSPoint) -> Void
     ) {
         self.dragIcon = dragIcon
@@ -52,9 +57,11 @@ final class FloatingIconHostingView: NSHostingView<FloatingIconView> {
     override func mouseDown(with event: NSEvent) {
         mouseDownLocation = NSEvent.mouseLocation
         shouldIgnoreMouseUp = false
+        didDragIcon = false
         if event.type == .rightMouseDown || event.modifierFlags.contains(.control) {
             mouseDownLocation = nil
             shouldIgnoreMouseUp = true
+            didDragIcon = false
             showContextMenu()
             return
         }
@@ -70,10 +77,14 @@ final class FloatingIconHostingView: NSHostingView<FloatingIconView> {
         longPressWorkItem?.cancel()
         guard let mouseDownLocation else { return }
         let current = NSEvent.mouseLocation
-        dragIcon(CGSize(
+        let translation = CGSize(
             width: current.x - mouseDownLocation.x,
             height: current.y - mouseDownLocation.y
-        ))
+        )
+        if hypot(translation.width, translation.height) > 3 {
+            didDragIcon = true
+        }
+        dragIcon(translation)
     }
 
     override func mouseUp(with event: NSEvent) {
@@ -81,24 +92,28 @@ final class FloatingIconHostingView: NSHostingView<FloatingIconView> {
         guard !shouldIgnoreMouseUp else {
             shouldIgnoreMouseUp = false
             mouseDownLocation = nil
+            didDragIcon = false
             return
         }
         guard let mouseDownLocation else {
-            finishIconDrag(.zero)
+            finishIconDrag(.zero, didDragIcon)
             return
         }
 
         let current = NSEvent.mouseLocation
+        let didDragIcon = self.didDragIcon
         self.mouseDownLocation = nil
+        self.didDragIcon = false
         finishIconDrag(CGSize(
             width: current.x - mouseDownLocation.x,
             height: current.y - mouseDownLocation.y
-        ))
+        ), didDragIcon)
     }
 
     override func rightMouseDown(with event: NSEvent) {
         mouseDownLocation = nil
         shouldIgnoreMouseUp = true
+        didDragIcon = false
         showContextMenu()
     }
 
@@ -112,6 +127,7 @@ final class FloatingIconHostingView: NSHostingView<FloatingIconView> {
         longPressWorkItem?.cancel()
         mouseDownLocation = nil
         shouldIgnoreMouseUp = true
+        didDragIcon = false
         showIconMenu(NSEvent.mouseLocation)
     }
 }
@@ -194,6 +210,7 @@ final class AppController: NSObject, NSApplicationDelegate {
         )
         window.isOpaque = false
         window.backgroundColor = .clear
+        window.appearance = NSAppearance(named: .aqua)
         window.hasShadow = false
         window.level = .floating
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
@@ -208,8 +225,8 @@ final class AppController: NSObject, NSApplicationDelegate {
             dragIcon: { [weak self] translation in
                 self?.dragIcon(translation: translation)
             },
-            finishIconDrag: { [weak self] translation in
-                self?.finishIconDrag(translation: translation)
+            finishIconDrag: { [weak self] translation, didDrag in
+                self?.finishIconDrag(translation: translation, didDrag: didDrag)
             },
             showIconMenu: { [weak self] point in
                 self?.showIconContextMenu(at: point)
@@ -284,6 +301,7 @@ final class AppController: NSObject, NSApplicationDelegate {
         )
         panel.isOpaque = false
         panel.backgroundColor = .clear
+        panel.appearance = NSAppearance(named: .aqua)
         panel.hasShadow = true
         panel.level = .floating
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
@@ -296,13 +314,26 @@ final class AppController: NSObject, NSApplicationDelegate {
             showSettings: { [weak self] in
                 self?.showSettingsPanel()
             },
+            refocusPanel: { [weak self] in
+                self?.refocusTodoPanelAfterSystemPrompt()
+            },
             closePanel: { [weak self] in
                 self?.closeTodoPanel()
             }
         )
-        panel.contentView = NSHostingView(rootView: view)
+        panel.contentView = makeLightHostingView(view)
         todoPanel = panel
         positionTodoPanel()
+    }
+
+    private func refocusTodoPanelAfterSystemPrompt() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+            guard let self, let todoPanel else { return }
+            positionTodoPanel()
+            todoPanel.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            lastPanelOpenedAt = Date()
+        }
     }
 
     private func positionIconWindow() {
@@ -356,10 +387,10 @@ final class AppController: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func finishIconDrag(translation: CGSize) {
+    private func finishIconDrag(translation: CGSize, didDrag: Bool) {
         defer { iconDragStartOrigin = nil }
 
-        if hypot(translation.width, translation.height) < 5 {
+        if !didDrag && hypot(translation.width, translation.height) < 5 {
             handleIconClick()
             return
         }
@@ -434,11 +465,12 @@ final class AppController: NSObject, NSApplicationDelegate {
         panel.setContentSize(size)
         panel.isOpaque = false
         panel.backgroundColor = .clear
+        panel.appearance = NSAppearance(named: .aqua)
         panel.hasShadow = true
         panel.level = .floating
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.isReleasedWhenClosed = false
-        panel.contentView = NSHostingView(rootView: SettingsPanelView(settings: settings) { [weak self] in
+        panel.contentView = makeLightHostingView(SettingsPanelView(settings: settings) { [weak self] in
             self?.settingsPanel?.orderOut(nil)
         })
         settingsPanel = panel
@@ -500,12 +532,13 @@ final class AppController: NSObject, NSApplicationDelegate {
         panel.setContentSize(size)
         panel.isOpaque = false
         panel.backgroundColor = .clear
+        panel.appearance = NSAppearance(named: .aqua)
         panel.hasShadow = true
         panel.level = .floating
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient]
         panel.isReleasedWhenClosed = false
         panel.ignoresMouseEvents = false
-        panel.contentView = NSHostingView(rootView: ReminderBubbleView(message: text, settings: settings) { [weak self] in
+        panel.contentView = makeLightHostingView(ReminderBubbleView(message: text, settings: settings) { [weak self] in
             ReminderSoundPlayer.shared.stop()
             self?.dismissReminderBubble()
         })

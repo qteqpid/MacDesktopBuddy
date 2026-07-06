@@ -19,9 +19,7 @@ final class ReminderCoordinator: ObservableObject {
     }
 
     private static let tickInterval: TimeInterval = 5
-    private static let taskReminderGracePeriod: TimeInterval = 2 * 60
-
-    private weak var store: TodoStore?
+    private let store: TodoStore
     private var timer: Timer?
     private var nextBreakAt: Date
     private var remindedTodoIDs: Set<UUID>
@@ -70,15 +68,17 @@ final class ReminderCoordinator: ObservableObject {
         "休息一下，调整状态。你不是来被任务支配的。"
     ]
 
-    init(store: TodoStore) {
+    init(store: TodoStore, autoStart: Bool = true) {
         self.store = store
         let storedInterval = UserDefaults.standard.integer(forKey: Keys.breakIntervalMinutes)
-        let initialInterval = storedInterval == 0 ? 50 : min(max(storedInterval, 15), 120)
+        let initialInterval = storedInterval == 0 ? 50 : ReminderTiming.normalizedBreakInterval(storedInterval)
         breakIntervalMinutes = initialInterval
         breakRemindersEnabled = UserDefaults.standard.object(forKey: Keys.breakRemindersEnabled) as? Bool ?? true
         nextBreakAt = Date().addingTimeInterval(TimeInterval(initialInterval * 60))
         remindedTodoIDs = AppPreferences.remindedTodoIDs
-        start()
+        if autoStart {
+            start()
+        }
     }
 
     deinit {
@@ -94,7 +94,7 @@ final class ReminderCoordinator: ObservableObject {
     }
 
     func setBreakIntervalMinutes(_ minutes: Int) {
-        let normalized = Self.normalizedBreakInterval(minutes)
+        let normalized = ReminderTiming.normalizedBreakInterval(minutes)
         guard breakIntervalMinutes != normalized else { return }
         breakIntervalMinutes = normalized
         UserDefaults.standard.set(normalized, forKey: Keys.breakIntervalMinutes)
@@ -103,10 +103,6 @@ final class ReminderCoordinator: ObservableObject {
 
     func resetBreakTimer() {
         nextBreakAt = Date().addingTimeInterval(TimeInterval(breakIntervalMinutes * 60))
-    }
-
-    private static func normalizedBreakInterval(_ minutes: Int) -> Int {
-        min(max(minutes, 15), 120)
     }
 
     private func start() {
@@ -121,20 +117,29 @@ final class ReminderCoordinator: ObservableObject {
     }
 
     private func tick() {
-        guard let store else { return }
-        let now = Date()
+        tick(now: Date())
+    }
+
+    func dueTaskReminder(now: Date = Date()) -> String? {
         remindedTodoIDs = AppPreferences.remindedTodoIDs
 
         for item in store.dueItems(now: now) where !remindedTodoIDs.contains(item.id) {
-            remindedTodoIDs.insert(item.id)
-            AppPreferences.remindedTodoIDs = remindedTodoIDs
-
             guard let reminderDate = item.reminderDate,
-                  now.timeIntervalSince(reminderDate) <= Self.taskReminderGracePeriod else {
+                  ReminderTiming.shouldDeliverTaskReminder(now: now, reminderDate: reminderDate) else {
                 continue
             }
 
-            show(item.title, playSound: true)
+            remindedTodoIDs.insert(item.id)
+            AppPreferences.remindedTodoIDs = remindedTodoIDs
+            return item.title
+        }
+
+        return nil
+    }
+
+    private func tick(now: Date) {
+        if let taskReminder = dueTaskReminder(now: now) {
+            show(taskReminder, playSound: true)
             return
         }
 

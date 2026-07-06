@@ -7,6 +7,7 @@ struct DeskTodoBuddyApp {
     @MainActor
     static func main() {
         let app = NSApplication.shared
+        app.appearance = NSAppearance(named: .aqua)
         let controller = AppController()
         Self.controller = controller
         app.delegate = controller

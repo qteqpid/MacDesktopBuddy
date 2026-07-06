@@ -19,6 +19,10 @@ let package = Package(
                 .linkedFramework("Speech"),
                 .linkedFramework("UserNotifications")
             ]
+        ),
+        .testTarget(
+            name: "DeskTodoBuddyTests",
+            dependencies: ["DeskTodoBuddy"]
         )
     ]
 )

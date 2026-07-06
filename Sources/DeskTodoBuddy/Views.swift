@@ -202,6 +202,7 @@ struct TodoPanelView: View {
     @FocusState private var isDraftFocused: Bool
 
     let showSettings: () -> Void
+    let refocusPanel: () -> Void
     let closePanel: () -> Void
 
     private var nextReminder: Date? {
@@ -243,6 +244,7 @@ struct TodoPanelView: View {
                 isDraftFocused: $isDraftFocused,
                 speech: speech,
                 settings: settings,
+                refocusPanel: refocusPanel,
                 addTodo: addTodo
             )
 
@@ -741,6 +743,7 @@ struct TodoComposerView: View {
     @ObservedObject var settings: AppSettings
     @State private var recordingPulse = false
 
+    let refocusPanel: () -> Void
     let addTodo: () -> Void
 
     var body: some View {
@@ -765,6 +768,8 @@ struct TodoComposerView: View {
                             draft = text
                             isDraftFocused.wrappedValue = true
                         }
+                        refocusPanel()
+                        isDraftFocused.wrappedValue = true
                     }
                 } label: {
                     ZStack {
@@ -1099,7 +1104,7 @@ struct TodoRowActions: View {
                             showingCustomReminder = false
                         },
                         save: {
-                            store.updateReminder(for: item, reminderDate: customReminderDate.removingSeconds())
+                            store.updateReminder(for: item, reminderDate: ReminderTiming.customReminderDate(from: customReminderDate))
                             showingCustomReminder = false
                         }
                     )
@@ -1119,14 +1124,6 @@ struct TodoRowActions: View {
             .buttonStyle(.plain)
             .help(AppStrings.delete(settings.language))
         }
-    }
-}
-
-private extension Date {
-    func removingSeconds() -> Date {
-        let calendar = Calendar.current
-        let components = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: self)
-        return calendar.date(from: components) ?? self
     }
 }
 
@@ -1151,7 +1148,6 @@ struct CustomReminderPopoverView: View {
             DatePicker(
                 AppStrings.reminderTime(settings.language),
                 selection: $reminderDate,
-                in: Date()...,
                 displayedComponents: [.date, .hourAndMinute]
             )
             .datePickerStyle(.compact)
