@@ -1,0 +1,4 @@
+Put your floating buddy image here as BuddyIcon.png.
+
+You can also run the app with:
+DESK_TODO_BUDDY_ICON=/absolute/path/to/image.png swift run
