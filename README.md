@@ -1,10 +1,24 @@
+<div align="center">
+
+<img src="Resources/BuddyIcon.png" alt="MacDesktopBuddy icon" width="112">
+
 # MacDesktopBuddy
 
-一个常驻 macOS 桌面的可爱待办小工具。MacDesktopBuddy 会把“小Q”放在桌面边角：点击打开待办面板，拖动移动位置，到点时在图标旁弹出提醒气泡并播放提示音。
+### 常驻 macOS 桌面的可爱待办小工具
 
-[中文](#中文) · [English](#english)
+**桌面小Q · 待办提醒 · 休息提醒 · 语音输入 · 数据只留在本机**
 
-<img src="Resources/BuddyIcon.png" alt="MacDesktopBuddy icon" width="160">
+### [官网与下载页 →](https://qteqpid.github.io/app-web/mac-desktop-buddy/index.html)
+
+[![Website](https://img.shields.io/badge/Website-Download%20Page-7b22b8.svg)](https://qteqpid.github.io/app-web/mac-desktop-buddy/index.html)
+[![macOS](https://img.shields.io/badge/macOS-13%2B-blue.svg)](#安装)
+[![Swift](https://img.shields.io/badge/Swift-5.9%2B-orange.svg)](#开发)
+[![Local first](https://img.shields.io/badge/Data-local%20first-brightgreen.svg)](#权限与隐私)
+[![Reminders](https://img.shields.io/badge/Todos%20%7C%20Breaks-reminders-blueviolet.svg)](#功能)
+
+**[中文](#中文) · [English](#english)**
+
+</div>
 
 ## 中文
 
