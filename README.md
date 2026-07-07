@@ -22,6 +22,12 @@
 
 ### 安装
 
+产品页面：
+
+```text
+https://qteqpid.github.io/app-web/mac-desktop-buddy/index.html
+```
+
 下载最新的 DMG release：
 
 ```text
@@ -145,6 +151,12 @@ MacDesktopBuddy is a small macOS desktop companion for todos, task reminders, an
 - Local-first storage: todos are stored locally with no backend service.
 
 ### Install
+
+Product page:
+
+```text
+https://qteqpid.github.io/app-web/mac-desktop-buddy/index.html
+```
 
 Download the latest DMG release:
 
