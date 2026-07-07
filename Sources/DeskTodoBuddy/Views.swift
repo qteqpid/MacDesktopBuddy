@@ -197,7 +197,6 @@ struct TodoPanelView: View {
     @StateObject private var speech = SpeechInputController()
 
     @State private var draft = ""
-    @State private var selectedSection: PanelSection = .tasks
     @FocusState private var isDraftFocused: Bool
 
     let showSettings: () -> Void
@@ -216,19 +215,11 @@ struct TodoPanelView: View {
                 nextReminder: nextReminder,
                 breakRemindersEnabled: reminders.breakRemindersEnabled,
                 settings: settings,
-                selectedSection: $selectedSection,
                 showSettings: showSettings,
                 closePanel: closePanel
             )
 
-            Group {
-                switch selectedSection {
-                case .tasks:
-                    tasksSection
-                case .focus:
-                    FocusPanelView(reminders: reminders, settings: settings)
-                }
-            }
+            tasksSection
             .padding(.horizontal, 18)
             .padding(.bottom, 16)
         }
@@ -312,10 +303,10 @@ struct PanelHeaderView: View {
     let nextReminder: Date?
     let breakRemindersEnabled: Bool
     @ObservedObject var settings: AppSettings
-    @Binding var selectedSection: PanelSection
     let showSettings: () -> Void
     let closePanel: () -> Void
     private let panelIcon = PanelIconImageProvider.loadImage()
+    @State private var taskSubtitle = ""
 
     var body: some View {
         VStack(spacing: 16) {
@@ -328,19 +319,10 @@ struct PanelHeaderView: View {
                             .font(.system(size: 21, weight: .semibold))
                             .foregroundStyle(PanelPalette.ink)
 
-                        Button {
-                            withAnimation(.easeOut(duration: 0.16)) {
-                                selectedSection = selectedSection == .tasks ? .focus : .tasks
-                            }
-                        } label: {
+                        Button(action: showSettings) {
                             HStack(spacing: 5) {
-                                if selectedSection == .tasks {
-                                    CoffeeReminderIcon(steaming: breakRemindersEnabled)
-                                } else {
-                                    Image(systemName: PanelSection.tasks.iconName)
-                                        .font(.system(size: 10, weight: .semibold))
-                                }
-                                Text(selectedSection == .tasks ? AppStrings.rest(settings.language) : AppStrings.tasks(settings.language))
+                                CoffeeReminderIcon(steaming: breakRemindersEnabled)
+                                Text(AppStrings.rest(settings.language))
                                     .font(.system(size: 11, weight: .semibold))
                             }
                             .foregroundStyle(PanelPalette.ink)
@@ -354,7 +336,7 @@ struct PanelHeaderView: View {
                             )
                         }
                         .buttonStyle(.plain)
-                        .help(selectedSection == .tasks ? AppStrings.openRest(settings.language) : AppStrings.backToTasks(settings.language))
+                        .help(AppStrings.settings(settings.language))
                     }
 
                     Text(headerSubtitle)
@@ -397,10 +379,28 @@ struct PanelHeaderView: View {
         .padding(.horizontal, 18)
         .padding(.top, 18)
         .padding(.bottom, 14)
+        .onAppear {
+            refreshTaskSubtitleIfNeeded()
+        }
+        .onChange(of: settings.language) { _ in
+            refreshTaskSubtitle()
+        }
     }
 
     private var headerSubtitle: String {
-        AppStrings.headerSubtitle(activeCount: activeCount, section: selectedSection, language: settings.language)
+        if !taskSubtitle.isEmpty {
+            return taskSubtitle
+        }
+        return AppStrings.headerSubtitle(activeCount: activeCount, section: .tasks, language: settings.language)
+    }
+
+    private func refreshTaskSubtitleIfNeeded() {
+        guard taskSubtitle.isEmpty else { return }
+        refreshTaskSubtitle()
+    }
+
+    private func refreshTaskSubtitle() {
+        taskSubtitle = AppStrings.randomTaskHeaderSubtitle(language: settings.language, excluding: taskSubtitle)
     }
 
     private var nextReminderText: String {
@@ -436,6 +436,7 @@ struct PanelHeaderIconView: View {
 
 struct SettingsPanelView: View {
     @ObservedObject var settings: AppSettings
+    @ObservedObject var reminders: ReminderCoordinator
     let close: () -> Void
 
     var body: some View {
@@ -459,41 +460,42 @@ struct SettingsPanelView: View {
                 .help(AppStrings.close(settings.language))
             }
 
-            VStack(alignment: .leading, spacing: 14) {
-                SettingsRow(title: AppStrings.theme(settings.language), systemImage: "paintpalette.fill", theme: settings.theme) {
-                    Picker("", selection: $settings.theme) {
-                        ForEach(AppTheme.allCases) { theme in
-                            Text(theme.displayName(language: settings.language)).tag(theme)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .frame(width: 240)
+            VStack(alignment: .leading, spacing: 12) {
+                SettingsSection {
+                    RestReminderSettingsCard(reminders: reminders, settings: settings)
                 }
 
-                Divider()
+                SettingsSection {
+                    VStack(alignment: .leading, spacing: 14) {
+                        SettingsRow(title: AppStrings.theme(settings.language), systemImage: "paintpalette.fill", theme: settings.theme) {
+                            Picker("", selection: $settings.theme) {
+                                ForEach(AppTheme.allCases) { theme in
+                                    Text(theme.displayName(language: settings.language)).tag(theme)
+                                }
+                            }
+                            .pickerStyle(.segmented)
+                            .frame(width: 240)
+                        }
 
-                SettingsRow(title: AppStrings.panelLanguage(settings.language), systemImage: "character.bubble.fill", theme: settings.theme) {
-                    Picker("", selection: $settings.language) {
-                        ForEach(AppLanguage.allCases) { language in
-                            Text(language.displayName).tag(language)
+                        Divider()
+
+                        SettingsRow(title: AppStrings.panelLanguage(settings.language), systemImage: "character.bubble.fill", theme: settings.theme) {
+                            Picker("", selection: $settings.language) {
+                                ForEach(AppLanguage.allCases) { language in
+                                    Text(language.displayName).tag(language)
+                                }
+                            }
+                            .pickerStyle(.segmented)
+                            .frame(width: 240)
                         }
                     }
-                    .pickerStyle(.segmented)
-                    .frame(width: 240)
                 }
             }
-            .padding(14)
-            .background(.thinMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .stroke(PanelPalette.panelStroke, lineWidth: 1)
-            )
 
             Spacer(minLength: 0)
         }
         .padding(18)
-        .frame(width: 520, height: 300)
+        .frame(width: 520, height: 500)
         .background(settingsBackground)
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         .overlay(
@@ -518,6 +520,21 @@ struct SettingsPanelView: View {
                     )
                 )
         }
+    }
+}
+
+struct SettingsSection<Content: View>: View {
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        content
+            .padding(14)
+            .background(.thinMaterial)
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .stroke(PanelPalette.panelStroke, lineWidth: 1)
+            )
     }
 }
 
@@ -991,7 +1008,7 @@ struct TodoRow: View {
     }
 
     var body: some View {
-        HStack(alignment: .top, spacing: 11) {
+        HStack(alignment: .center, spacing: 11) {
             Button {
                 store.toggle(item)
             } label: {
@@ -1002,7 +1019,6 @@ struct TodoRow: View {
             }
             .buttonStyle(.plain)
             .help(isCompletedStyle ? AppStrings.markUndone(settings.language) : AppStrings.markDone(settings.language))
-            .padding(.top, 1)
 
             VStack(alignment: .leading, spacing: 6) {
                 Text(item.title)
@@ -1020,7 +1036,6 @@ struct TodoRow: View {
             Spacer(minLength: 8)
 
             TodoRowActions(item: item, store: store, settings: settings, showSettings: showSettings, isCompleted: isCompletedStyle, hasReminder: item.reminderDate != nil)
-                .padding(.top, 1)
         }
         .padding(.horizontal, 11)
         .padding(.vertical, 10)
@@ -1183,6 +1198,8 @@ struct UtilityBottomBar: View {
 
     var body: some View {
         HStack(spacing: 8) {
+            Spacer()
+
             if let error {
                 Label(error, systemImage: "exclamationmark.triangle.fill")
                     .font(.system(size: 11, weight: .medium))
@@ -1193,23 +1210,79 @@ struct UtilityBottomBar: View {
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(PanelPalette.secondaryInk)
             }
-
-            Spacer()
-
-            Button {
-                NSApp.terminate(nil)
-            } label: {
-                Image(systemName: "power")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(PanelPalette.secondaryInk)
-                    .frame(width: 28, height: 28)
-            }
-            .buttonStyle(.plain)
-            .background(PanelPalette.surface)
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .help(AppStrings.quit(settings.language))
         }
         .frame(height: 30)
+    }
+}
+
+struct RestReminderSettingsCard: View {
+    @ObservedObject var reminders: ReminderCoordinator
+    @ObservedObject var settings: AppSettings
+
+    var body: some View {
+        VStack(spacing: 14) {
+            HStack(alignment: .center, spacing: 12) {
+                Image(systemName: "figure.mind.and.body")
+                    .font(.system(size: 19, weight: .semibold))
+                    .foregroundStyle(PanelPalette.themeAccent(settings.theme))
+                    .frame(width: 38, height: 38)
+                    .background(PanelPalette.themeAccent(settings.theme).opacity(0.14))
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(AppStrings.restReminder(settings.language))
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(PanelPalette.ink)
+                    Text(AppStrings.breakStatus(enabled: reminders.breakRemindersEnabled, minutes: reminders.breakIntervalMinutes, language: settings.language))
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(PanelPalette.secondaryInk)
+                }
+
+                Spacer()
+
+                Toggle("", isOn: $reminders.breakRemindersEnabled)
+                    .toggleStyle(.switch)
+                    .labelsHidden()
+            }
+
+            Divider()
+
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Text(AppStrings.interval(settings.language))
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(PanelPalette.secondaryInk)
+                    Spacer()
+                    Text(AppStrings.minutes(reminders.breakIntervalMinutes, language: settings.language))
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(PanelPalette.ink)
+                }
+
+                Slider(
+                    value: Binding(
+                        get: { Double(reminders.breakIntervalMinutes) },
+                        set: { reminders.setBreakIntervalMinutes(Int(($0 / 5).rounded()) * 5) }
+                    ),
+                    in: 15...120,
+                    step: 5
+                )
+                .disabled(!reminders.breakRemindersEnabled)
+            }
+
+            HStack(spacing: 8) {
+                BreakPresetButton(title: "25", selected: reminders.breakIntervalMinutes == 25) {
+                    reminders.setBreakIntervalMinutes(25)
+                }
+                BreakPresetButton(title: "50", selected: reminders.breakIntervalMinutes == 50) {
+                    reminders.setBreakIntervalMinutes(50)
+                }
+                BreakPresetButton(title: "90", selected: reminders.breakIntervalMinutes == 90) {
+                    reminders.setBreakIntervalMinutes(90)
+                }
+            }
+            .disabled(!reminders.breakRemindersEnabled)
+            .opacity(reminders.breakRemindersEnabled ? 1 : 0.48)
+        }
     }
 }
 
@@ -1219,77 +1292,7 @@ struct FocusPanelView: View {
 
     var body: some View {
         VStack(spacing: 14) {
-            VStack(spacing: 14) {
-                HStack(alignment: .center, spacing: 12) {
-                    Image(systemName: "figure.mind.and.body")
-                        .font(.system(size: 19, weight: .semibold))
-                        .foregroundStyle(PanelPalette.themeAccent(settings.theme))
-                        .frame(width: 38, height: 38)
-                        .background(PanelPalette.themeAccent(settings.theme).opacity(0.14))
-                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(AppStrings.restReminder(settings.language))
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(PanelPalette.ink)
-                        Text(AppStrings.breakStatus(enabled: reminders.breakRemindersEnabled, minutes: reminders.breakIntervalMinutes, language: settings.language))
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(PanelPalette.secondaryInk)
-                    }
-
-                    Spacer()
-
-                    Toggle("", isOn: $reminders.breakRemindersEnabled)
-                        .toggleStyle(.switch)
-                        .labelsHidden()
-                }
-
-                Divider()
-
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack {
-                        Text(AppStrings.interval(settings.language))
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(PanelPalette.secondaryInk)
-                        Spacer()
-                        Text(AppStrings.minutes(reminders.breakIntervalMinutes, language: settings.language))
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(PanelPalette.ink)
-                    }
-
-                    Slider(
-                        value: Binding(
-                            get: { Double(reminders.breakIntervalMinutes) },
-                            set: { reminders.setBreakIntervalMinutes(Int(($0 / 5).rounded()) * 5) }
-                        ),
-                        in: 15...120,
-                        step: 5
-                    )
-                    .disabled(!reminders.breakRemindersEnabled)
-                }
-
-                HStack(spacing: 8) {
-                    BreakPresetButton(title: "25", selected: reminders.breakIntervalMinutes == 25) {
-                        reminders.setBreakIntervalMinutes(25)
-                    }
-                    BreakPresetButton(title: "50", selected: reminders.breakIntervalMinutes == 50) {
-                        reminders.setBreakIntervalMinutes(50)
-                    }
-                    BreakPresetButton(title: "90", selected: reminders.breakIntervalMinutes == 90) {
-                        reminders.setBreakIntervalMinutes(90)
-                    }
-                }
-                .disabled(!reminders.breakRemindersEnabled)
-                .opacity(reminders.breakRemindersEnabled ? 1 : 0.48)
-            }
-            .padding(14)
-            .background(.thinMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .stroke(PanelPalette.panelStroke, lineWidth: 1)
-            )
-
+            RestReminderSettingsCard(reminders: reminders, settings: settings)
             Spacer()
 
             UtilityBottomBar(error: nil, settings: settings)

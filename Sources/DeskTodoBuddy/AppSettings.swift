@@ -143,10 +143,67 @@ enum AppStrings {
         if section == .focus {
             return language == .chinese ? "让小Q提醒你及时放松" : "Let Q remind you to pause"
         }
-        if activeCount == 0 {
-            return language == .chinese ? "今天先放一件小事进去" : "Start with one small thing today"
+        return randomTaskHeaderSubtitle(language: language)
+    }
+
+    static func randomTaskHeaderSubtitle(language: AppLanguage, excluding current: String? = nil) -> String {
+        let subtitles = taskHeaderSubtitles(language)
+        let candidates = subtitles.filter { $0 != current }
+        return (candidates.randomElement() ?? subtitles.randomElement()) ?? ""
+    }
+
+    private static func taskHeaderSubtitles(_ language: AppLanguage) -> [String] {
+        switch language {
+        case .chinese:
+            return [
+                "今天向前一步，光就近一点。",
+                "把热爱落在行动里。",
+                "心里有光，脚下有路。",
+                "去做吧，答案在路上。",
+                "让今天比昨天更有回响。",
+                "带着好心情，把小事做好。",
+                "每一次开始，都在靠近更好的自己。",
+                "先动起来，风也会来帮你。",
+                "把普通一天过出亮光。",
+                "今天的努力，会成为明天的底气。",
+                "眼里有方向，手上有行动。",
+                "向阳而行，步履不停。",
+                "认真做事的人，自带光芒。",
+                "把计划写下，把行动交给现在。",
+                "今日份进步，从这一件事开始。",
+                "追光的人，也会成为光。",
+                "不负清晨，也不负此刻。",
+                "让心情放晴，让事情推进。",
+                "小小一步，也有新的可能。",
+                "今天适合发光，也适合完成。",
+                "保持热爱，稳稳向前。",
+                "把期待变成行动。",
+                "趁阳光正好，做点漂亮的事。",
+                "一点点认真，会把日子照亮。",
+                "你只管向前，路会慢慢清晰。",
+                "让今天有开始，也有收获。",
+                "心向远方，先做好眼前。",
+                "好状态，从完成一件小事开始。",
+                "每个当下，都是新的起点。",
+                "今天也要闪闪发光地前进。"
+            ]
+        case .english:
+            return [
+                "Put what you love into action.",
+                "Begin now; the answer is on the way.",
+                "Start moving, and the wind will meet you.",
+                "Give an ordinary day a little shine.",
+                "Those who chase light can become light.",
+                "Honor the morning, and honor this moment.",
+                "Today is good for shining and finishing.",
+                "Keep the love, keep moving steadily.",
+                "Stay hungry, stay foolish.",
+                "Turn expectation into action.",
+                "A little care can light up the day.",
+                "Every moment is a fresh starting point.",
+                "Move forward with a little sparkle today."
+            ]
         }
-        return language == .chinese ? "当前还有 \(activeCount) 件事待推进" : "\(activeCount) item\(activeCount == 1 ? "" : "s") in progress"
     }
 
     static func todoPlaceholder(_ language: AppLanguage) -> String {

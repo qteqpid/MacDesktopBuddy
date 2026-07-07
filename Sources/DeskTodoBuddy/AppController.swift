@@ -477,7 +477,7 @@ final class AppController: NSObject, NSApplicationDelegate {
     }
 
     private func showSettingsPanel() {
-        let size = NSSize(width: 520, height: 300)
+        let size = NSSize(width: 520, height: 500)
         let panel = settingsPanel ?? BuddyPanel(
             contentRect: NSRect(origin: .zero, size: size),
             styleMask: [.borderless, .fullSizeContentView],
@@ -492,7 +492,7 @@ final class AppController: NSObject, NSApplicationDelegate {
         panel.level = .floating
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         panel.isReleasedWhenClosed = false
-        panel.contentView = makeLightHostingView(SettingsPanelView(settings: settings) { [weak self] in
+        panel.contentView = makeLightHostingView(SettingsPanelView(settings: settings, reminders: reminders) { [weak self] in
             self?.settingsPanel?.orderOut(nil)
         })
         settingsPanel = panel
