@@ -154,6 +154,7 @@ final class AppController: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.accessory)
         settings.onChange = { [weak self] in
             self?.refreshMenus()
+            self?.refreshLogoDisplays()
         }
         createStatusItem()
 
@@ -172,7 +173,8 @@ final class AppController: NSObject, NSApplicationDelegate {
         applyIconVisibility()
 
         reminders.onTimedReminder = { [weak self] text in
-            self?.showReminderBubble(text)
+            guard let self else { return }
+            self.showReminderBubble(self.personalizedReminderText(text))
         }
     }
 
@@ -240,7 +242,8 @@ final class AppController: NSObject, NSApplicationDelegate {
 
         let view = FloatingIconView(
             store: store,
-            reminders: reminders
+            reminders: reminders,
+            settings: settings
         )
         window.contentView = FloatingIconHostingView(
             rootView: view,
@@ -264,7 +267,7 @@ final class AppController: NSObject, NSApplicationDelegate {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         item.button?.image = makeStatusBarIcon()
         item.button?.imagePosition = .imageOnly
-        item.button?.toolTip = "小Q"
+        item.button?.toolTip = settings.displayName
 
         statusItem = item
         refreshMenus()
@@ -273,7 +276,7 @@ final class AppController: NSObject, NSApplicationDelegate {
 
     private func refreshMenus() {
         let menu = NSMenu()
-        menu.addItem(NSMenuItem(title: AppStrings.restoreXiaoQ(settings.language), action: #selector(restoreIconFromMenu), keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: AppStrings.restoreBuddy(settings.displayName, language: settings.language), action: #selector(restoreIconFromMenu), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: AppStrings.settings(settings.language), action: #selector(showSettingsFromMenu), keyEquivalent: ","))
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: AppStrings.quit(settings.language), action: #selector(quitFromMenu), keyEquivalent: "q"))
@@ -281,9 +284,14 @@ final class AppController: NSObject, NSApplicationDelegate {
         statusItem?.menu = menu
     }
 
+    private func refreshLogoDisplays() {
+        statusItem?.button?.image = makeStatusBarIcon()
+        statusItem?.button?.toolTip = settings.displayName
+    }
+
     private func makeStatusBarIcon() -> NSImage? {
         guard let source = BuddyIconImageProvider.loadImage() else {
-            return NSImage(systemSymbolName: "bird.fill", accessibilityDescription: "小Q")
+            return NSImage(systemSymbolName: "bird.fill", accessibilityDescription: settings.displayName)
         }
 
         let size = NSSize(width: 18, height: 18)
@@ -297,7 +305,7 @@ final class AppController: NSObject, NSApplicationDelegate {
         )
         image.unlockFocus()
         image.isTemplate = false
-        image.accessibilityDescription = "小Q"
+        image.accessibilityDescription = settings.displayName
         return image
     }
 
@@ -477,7 +485,7 @@ final class AppController: NSObject, NSApplicationDelegate {
     }
 
     private func showSettingsPanel() {
-        let size = NSSize(width: 520, height: 500)
+        let size = NSSize(width: 520, height: 540)
         let panel = settingsPanel ?? BuddyPanel(
             contentRect: NSRect(origin: .zero, size: size),
             styleMask: [.borderless, .fullSizeContentView],
@@ -576,6 +584,10 @@ final class AppController: NSObject, NSApplicationDelegate {
                 self?.reminderBubblePanel?.orderOut(nil)
             }
         }
+    }
+
+    private func personalizedReminderText(_ text: String) -> String {
+        text.replacingOccurrences(of: AppStrings.defaultAppName(.chinese), with: settings.displayName)
     }
 
     private func positionReminderBubble() {

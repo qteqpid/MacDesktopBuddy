@@ -71,6 +71,10 @@ enum AppPaths {
     static var todosURL: URL {
         supportDirectory.appendingPathComponent("todos.json")
     }
+
+    static var customLogoURL: URL {
+        supportDirectory.appendingPathComponent("custom-logo.png")
+    }
 }
 
 enum AppPreferences {

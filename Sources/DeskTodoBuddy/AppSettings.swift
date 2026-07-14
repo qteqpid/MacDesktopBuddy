@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 enum AppTheme: String, CaseIterable, Identifiable {
@@ -46,11 +47,21 @@ final class AppSettings: ObservableObject {
         }
     }
 
+    @Published var customAppName: String {
+        didSet {
+            UserDefaults.standard.set(customAppName, forKey: Keys.customAppName)
+            onChange?()
+        }
+    }
+
+    @Published private(set) var logoRevision = UUID()
+
     var onChange: (() -> Void)?
 
     private enum Keys {
         static let theme = "appTheme"
         static let language = "appLanguage"
+        static let customAppName = "customAppName"
     }
 
     init() {
@@ -59,6 +70,40 @@ final class AppSettings: ObservableObject {
 
         let storedLanguage = UserDefaults.standard.string(forKey: Keys.language)
         language = storedLanguage.flatMap(AppLanguage.init(rawValue:)) ?? .chinese
+
+        customAppName = UserDefaults.standard.string(forKey: Keys.customAppName) ?? ""
+    }
+
+    var displayName: String {
+        let normalized = customAppName.trimmingCharacters(in: .whitespacesAndNewlines)
+        return normalized.isEmpty ? AppStrings.defaultAppName(language) : normalized
+    }
+
+    var hasCustomLogo: Bool {
+        FileManager.default.fileExists(atPath: AppPaths.customLogoURL.path)
+    }
+
+    func updateLogo(from sourceURL: URL) throws {
+        guard let image = NSImage(contentsOf: sourceURL),
+              let tiffData = image.tiffRepresentation,
+              let bitmap = NSBitmapImageRep(data: tiffData),
+              let pngData = bitmap.representation(using: .png, properties: [:]) else {
+            throw CocoaError(.fileReadCorruptFile)
+        }
+
+        try FileManager.default.createDirectory(at: AppPaths.supportDirectory, withIntermediateDirectories: true)
+        try pngData.write(to: AppPaths.customLogoURL, options: .atomic)
+        logoRevision = UUID()
+        onChange?()
+    }
+
+    func resetLogo() throws {
+        let url = AppPaths.customLogoURL
+        if FileManager.default.fileExists(atPath: url.path) {
+            try FileManager.default.removeItem(at: url)
+        }
+        logoRevision = UUID()
+        onChange?()
     }
 }
 
@@ -95,16 +140,44 @@ enum AppStrings {
         language == .chinese ? "面板显示语言" : "Panel language"
     }
 
+    static func displayName(_ language: AppLanguage) -> String {
+        language == .chinese ? "显示名称" : "Display name"
+    }
+
+    static func displayNamePlaceholder(_ language: AppLanguage) -> String {
+        defaultAppName(language)
+    }
+
+    static func logoImage(_ language: AppLanguage) -> String {
+        language == .chinese ? "头像图片" : "Logo image"
+    }
+
+    static func chooseLogo(_ language: AppLanguage) -> String {
+        language == .chinese ? "选择图片" : "Choose"
+    }
+
+    static func resetLogo(_ language: AppLanguage) -> String {
+        language == .chinese ? "恢复默认" : "Reset"
+    }
+
+    static func logoUpdateFailed(_ language: AppLanguage) -> String {
+        language == .chinese ? "头像图片更新失败" : "Logo update failed"
+    }
+
     static func appearanceSubtitle(_ language: AppLanguage) -> String {
         language == .chinese ? "选择小Q面板和提醒气泡的颜色" : "Choose the panel and reminder bubble color"
     }
 
-    static func appName(_ language: AppLanguage) -> String {
+    static func defaultAppName(_ language: AppLanguage) -> String {
         language == .chinese ? "小Q" : "Hi, Q"
     }
 
-    static func reminderTitle(_ language: AppLanguage) -> String {
-        language == .chinese ? "小Q提醒" : "Q Reminder"
+    static func restoreBuddy(_ name: String, language: AppLanguage) -> String {
+        language == .chinese ? "显示\(name)" : "Show \(name)"
+    }
+
+    static func reminderTitle(_ name: String, language: AppLanguage) -> String {
+        language == .chinese ? "\(name)提醒" : "\(name) Reminder"
     }
 
     static func tasks(_ language: AppLanguage) -> String {

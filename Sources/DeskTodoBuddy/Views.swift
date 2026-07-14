@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import UniformTypeIdentifiers
 
 enum BuddyIconImageProvider {
     static func loadImage() -> NSImage? {
@@ -14,6 +15,7 @@ enum BuddyIconImageProvider {
 
     private static func candidatePaths() -> [String] {
         var paths: [String] = []
+        paths.append(AppPaths.customLogoURL.path)
 
         if let path = ProcessInfo.processInfo.environment["DESK_TODO_BUDDY_ICON"],
            !path.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -53,6 +55,8 @@ enum PanelIconImageProvider {
 
     private static func candidatePaths() -> [String] {
         var paths: [String] = []
+        paths.append(AppPaths.customLogoURL.path)
+
         let currentDirectory = FileManager.default.currentDirectoryPath
         paths.append("\(currentDirectory)/Resources/PanelIcon.jpg")
 
@@ -69,10 +73,11 @@ enum PanelIconImageProvider {
 struct FloatingIconView: View {
     @ObservedObject var store: TodoStore
     @ObservedObject var reminders: ReminderCoordinator
+    @ObservedObject var settings: AppSettings
 
     @State private var isHovering = false
     @State private var isBobbing = false
-    private let iconImage = BuddyIconImageProvider.loadImage()
+    @State private var iconImage: NSImage?
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
@@ -95,9 +100,13 @@ struct FloatingIconView: View {
         .help("拖动移动，点击打开 DeskTodoBuddy")
         .onHover { isHovering = $0 }
         .onAppear {
+            iconImage = BuddyIconImageProvider.loadImage()
             withAnimation(.easeInOut(duration: 1.8).repeatForever(autoreverses: true)) {
                 isBobbing = true
             }
+        }
+        .onChange(of: settings.logoRevision) { _ in
+            iconImage = BuddyIconImageProvider.loadImage()
         }
     }
 }
@@ -138,6 +147,7 @@ struct BuiltInBuddyIcon: View {
                 .offset(y: 22)
         }
     }
+
 }
 
 enum PanelSection: String, CaseIterable, Identifiable {
@@ -305,7 +315,6 @@ struct PanelHeaderView: View {
     @ObservedObject var settings: AppSettings
     let showSettings: () -> Void
     let closePanel: () -> Void
-    private let panelIcon = PanelIconImageProvider.loadImage()
     @State private var taskSubtitle = ""
 
     var body: some View {
@@ -315,7 +324,7 @@ struct PanelHeaderView: View {
 
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 9) {
-                        Text(AppStrings.appName(settings.language))
+                        Text(settings.displayName)
                             .font(.system(size: 21, weight: .semibold))
                             .foregroundStyle(PanelPalette.ink)
 
@@ -407,6 +416,11 @@ struct PanelHeaderView: View {
         guard let nextReminder else { return AppStrings.none(settings.language) }
         return nextReminder.formatted(date: .omitted, time: .shortened)
     }
+
+    private var panelIcon: NSImage? {
+        _ = settings.logoRevision
+        return PanelIconImageProvider.loadImage()
+    }
 }
 
 struct PanelHeaderIconView: View {
@@ -438,6 +452,7 @@ struct SettingsPanelView: View {
     @ObservedObject var settings: AppSettings
     @ObservedObject var reminders: ReminderCoordinator
     let close: () -> Void
+    @State private var logoErrorMessage: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -467,6 +482,20 @@ struct SettingsPanelView: View {
 
                 SettingsSection {
                     VStack(alignment: .leading, spacing: 14) {
+                        SettingsRow(title: AppStrings.logoImage(settings.language), systemImage: "photo.fill", theme: settings.theme) {
+                            LogoSettingsControl(settings: settings, errorMessage: $logoErrorMessage)
+                        }
+
+                        Divider()
+
+                        SettingsRow(title: AppStrings.displayName(settings.language), systemImage: "textformat", theme: settings.theme) {
+                            TextField(AppStrings.displayNamePlaceholder(settings.language), text: $settings.customAppName)
+                                .textFieldStyle(.roundedBorder)
+                                .font(.system(size: 13, weight: .medium))
+                        }
+
+                        Divider()
+
                         SettingsRow(title: AppStrings.theme(settings.language), systemImage: "paintpalette.fill", theme: settings.theme) {
                             Picker("", selection: $settings.theme) {
                                 ForEach(AppTheme.allCases) { theme in
@@ -495,13 +524,30 @@ struct SettingsPanelView: View {
             Spacer(minLength: 0)
         }
         .padding(18)
-        .frame(width: 520, height: 500)
+        .frame(width: 520, height: 540)
         .background(settingsBackground)
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .stroke(PanelPalette.panelStroke, lineWidth: 1)
         )
+        .alert(
+            AppStrings.logoUpdateFailed(settings.language),
+            isPresented: Binding(
+                get: { logoErrorMessage != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        logoErrorMessage = nil
+                    }
+                }
+            )
+        ) {
+            Button(AppStrings.close(settings.language), role: .cancel) {
+                logoErrorMessage = nil
+            }
+        } message: {
+            Text(logoErrorMessage ?? "")
+        }
     }
 
     private var settingsBackground: some View {
@@ -520,6 +566,88 @@ struct SettingsPanelView: View {
                     )
                 )
         }
+    }
+}
+
+struct LogoSettingsControl: View {
+    @ObservedObject var settings: AppSettings
+    @Binding var errorMessage: String?
+
+    var body: some View {
+        HStack(spacing: 8) {
+            LogoPreviewView(image: logoImage)
+
+            Button(AppStrings.chooseLogo(settings.language), action: chooseLogo)
+                .buttonStyle(.borderless)
+
+            Button(AppStrings.resetLogo(settings.language), action: resetLogo)
+                .buttonStyle(.borderless)
+                .disabled(!settings.hasCustomLogo)
+        }
+    }
+
+    private var logoImage: NSImage? {
+        _ = settings.logoRevision
+        return PanelIconImageProvider.loadImage()
+    }
+
+    private func chooseLogo() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.image]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.canChooseFiles = true
+
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+
+        do {
+            let isAccessing = url.startAccessingSecurityScopedResource()
+            defer {
+                if isAccessing {
+                    url.stopAccessingSecurityScopedResource()
+                }
+            }
+            try settings.updateLogo(from: url)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func resetLogo() {
+        do {
+            try settings.resetLogo()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+}
+
+struct LogoPreviewView: View {
+    let image: NSImage?
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .fill(PanelPalette.row)
+
+            if let image {
+                Image(nsImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 30, height: 30)
+                    .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+            } else {
+                Image(systemName: "photo")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(PanelPalette.secondaryInk)
+            }
+        }
+        .frame(width: 30, height: 30)
+        .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .stroke(PanelPalette.panelStroke, lineWidth: 1)
+        )
     }
 }
 
@@ -699,7 +827,7 @@ struct ReminderBubbleView: View {
                 .frame(width: 32, height: 32)
 
                 VStack(alignment: .leading, spacing: 5) {
-                    Text(AppStrings.reminderTitle(settings.language))
+                    Text(AppStrings.reminderTitle(settings.displayName, language: settings.language))
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(PanelPalette.secondaryInk)
                     Text(message)
