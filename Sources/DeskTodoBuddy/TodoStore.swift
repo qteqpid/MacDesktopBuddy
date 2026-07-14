@@ -46,6 +46,15 @@ final class TodoStore: ObservableObject {
         persistAndNotify()
     }
 
+    func updateTitle(for item: TodoItem, title: String) {
+        let normalized = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalized.isEmpty else { return }
+        guard let index = items.firstIndex(where: { $0.id == item.id }) else { return }
+        guard items[index].title != normalized else { return }
+        items[index].title = normalized
+        persistAndNotify()
+    }
+
     func updateReminder(for item: TodoItem, reminderDate: Date?) {
         guard let index = items.firstIndex(where: { $0.id == item.id }) else { return }
         items[index].reminderDate = reminderDate

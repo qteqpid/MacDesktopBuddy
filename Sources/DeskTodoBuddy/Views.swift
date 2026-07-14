@@ -769,13 +769,14 @@ struct TodoComposerView: View {
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(PanelPalette.themeAccent(settings.theme))
 
-                AutoScrollingTextField(
-                    AppStrings.todoPlaceholder(settings.language),
-                    text: $draft,
-                    isFocused: isDraftFocused,
-                    onSubmit: addTodo
-                )
-                .frame(height: 22)
+                TextField(AppStrings.todoPlaceholder(settings.language), text: $draft, axis: .vertical)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(PanelPalette.ink)
+                    .focused(isDraftFocused)
+                    .lineLimit(nil)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .onSubmit(addTodo)
 
                 Button {
                     Task {
@@ -854,94 +855,6 @@ struct TodoComposerView: View {
     }
 }
 
-struct AutoScrollingTextField: NSViewRepresentable {
-    let placeholder: String
-    @Binding var text: String
-    var isFocused: FocusState<Bool>.Binding
-    let onSubmit: () -> Void
-
-    init(
-        _ placeholder: String,
-        text: Binding<String>,
-        isFocused: FocusState<Bool>.Binding,
-        onSubmit: @escaping () -> Void
-    ) {
-        self.placeholder = placeholder
-        _text = text
-        self.isFocused = isFocused
-        self.onSubmit = onSubmit
-    }
-
-    func makeNSView(context: Context) -> NSTextField {
-        let textField = NSTextField()
-        textField.isBordered = false
-        textField.drawsBackground = false
-        textField.focusRingType = .none
-        textField.font = .systemFont(ofSize: 14, weight: .medium)
-        textField.placeholderString = placeholder
-        textField.delegate = context.coordinator
-        textField.lineBreakMode = .byClipping
-        return textField
-    }
-
-    func updateNSView(_ textField: NSTextField, context: Context) {
-        context.coordinator.parent = self
-
-        if textField.stringValue != text {
-            textField.stringValue = text
-        }
-        textField.placeholderString = placeholder
-
-        if isFocused.wrappedValue {
-            textField.window?.makeFirstResponder(textField)
-            Self.scrollToEnd(textField)
-        }
-    }
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator(parent: self)
-    }
-
-    private static func scrollToEnd(_ textField: NSTextField) {
-        DispatchQueue.main.async {
-            guard let editor = textField.currentEditor() as? NSTextView else { return }
-            let end = (textField.stringValue as NSString).length
-            let range = NSRange(location: end, length: 0)
-            editor.selectedRange = range
-            editor.scrollRangeToVisible(range)
-        }
-    }
-
-    final class Coordinator: NSObject, NSTextFieldDelegate {
-        var parent: AutoScrollingTextField
-
-        init(parent: AutoScrollingTextField) {
-            self.parent = parent
-        }
-
-        func controlTextDidChange(_ notification: Notification) {
-            guard let textField = notification.object as? NSTextField else { return }
-            parent.text = textField.stringValue
-        }
-
-        func controlTextDidBeginEditing(_ notification: Notification) {
-            parent.isFocused.wrappedValue = true
-        }
-
-        func controlTextDidEndEditing(_ notification: Notification) {
-            parent.isFocused.wrappedValue = false
-        }
-
-        func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
-            if commandSelector == #selector(NSResponder.insertNewline(_:)) {
-                parent.onSubmit()
-                return true
-            }
-            return false
-        }
-    }
-}
-
 struct TodoListView: View {
     @ObservedObject var store: TodoStore
     @ObservedObject var settings: AppSettings
@@ -998,6 +911,10 @@ struct TodoRow: View {
     let showSettings: () -> Void
     var displayAsCompleted = false
 
+    @State private var isEditingTitle = false
+    @State private var editedTitle = ""
+    @FocusState private var isTitleEditorFocused: Bool
+
     private var isDue: Bool {
         guard let reminderDate = item.reminderDate else { return false }
         return reminderDate <= Date() && !item.isDone
@@ -1021,21 +938,79 @@ struct TodoRow: View {
             .help(isCompletedStyle ? AppStrings.markUndone(settings.language) : AppStrings.markDone(settings.language))
 
             VStack(alignment: .leading, spacing: 6) {
-                Text(item.title)
-                    .font(.system(size: 13, weight: .semibold))
-                    .strikethrough(isCompletedStyle)
-                    .foregroundStyle(isCompletedStyle ? PanelPalette.secondaryInk : PanelPalette.ink)
-                    .lineLimit(nil)
-                    .fixedSize(horizontal: false, vertical: true)
+                if isEditingTitle {
+                    HStack(spacing: 6) {
+                        TextField("", text: $editedTitle, axis: .vertical)
+                            .textFieldStyle(.plain)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(PanelPalette.ink)
+                            .focused($isTitleEditorFocused)
+                            .lineLimit(nil)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 5)
+                            .background(Color(nsColor: .textBackgroundColor).opacity(0.95))
+                            .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                                    .stroke(PanelPalette.themeAccent(settings.theme).opacity(0.75), lineWidth: 1)
+                            )
+                            .onSubmit(commitTitleEdit)
+                            .onExitCommand(perform: cancelTitleEdit)
+                            .onAppear {
+                                isTitleEditorFocused = true
+                            }
+
+                        Button(action: commitTitleEdit) {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundStyle(.white)
+                                .frame(width: 22, height: 22)
+                                .background(canCommitTitleEdit ? PanelPalette.themeAccent(settings.theme) : PanelPalette.secondaryInk.opacity(0.35))
+                                .clipShape(Circle())
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(!canCommitTitleEdit)
+                        .help(AppStrings.save(settings.language))
+
+                        Button(action: cancelTitleEdit) {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 11, weight: .bold))
+                                .foregroundStyle(PanelPalette.secondaryInk)
+                                .frame(width: 22, height: 22)
+                                .background(Color(nsColor: .textBackgroundColor).opacity(0.75))
+                                .clipShape(Circle())
+                        }
+                        .buttonStyle(.plain)
+                        .help(AppStrings.cancel(settings.language))
+                    }
+                } else {
+                    Text(item.title)
+                        .font(.system(size: 13, weight: .semibold))
+                        .strikethrough(isCompletedStyle)
+                        .foregroundStyle(isCompletedStyle ? PanelPalette.secondaryInk : PanelPalette.ink)
+                        .textSelection(.enabled)
+                        .lineLimit(nil)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
 
                 if let reminderDate = item.reminderDate, !isCompletedStyle {
                     ReminderBadgeView(date: reminderDate, isDue: isDue)
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
 
             Spacer(minLength: 8)
 
-            TodoRowActions(item: item, store: store, settings: settings, showSettings: showSettings, isCompleted: isCompletedStyle, hasReminder: item.reminderDate != nil)
+            TodoRowActions(
+                item: item,
+                store: store,
+                settings: settings,
+                showSettings: showSettings,
+                edit: beginTitleEdit,
+                isCompleted: isCompletedStyle,
+                hasReminder: item.reminderDate != nil
+            )
         }
         .padding(.horizontal, 11)
         .padding(.vertical, 10)
@@ -1046,6 +1021,28 @@ struct TodoRow: View {
                 .stroke(isDue && !isCompletedStyle ? PanelPalette.coral.opacity(0.58) : PanelPalette.panelStroke, lineWidth: 1)
         )
         .opacity(isCompletedStyle ? 0.58 : 1)
+    }
+
+    private func beginTitleEdit() {
+        editedTitle = item.title
+        isEditingTitle = true
+    }
+
+    private var canCommitTitleEdit: Bool {
+        !editedTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private func commitTitleEdit() {
+        guard isEditingTitle else { return }
+        guard canCommitTitleEdit else { return }
+        store.updateTitle(for: item, title: editedTitle)
+        isEditingTitle = false
+    }
+
+    private func cancelTitleEdit() {
+        guard isEditingTitle else { return }
+        editedTitle = item.title
+        isEditingTitle = false
     }
 }
 
@@ -1066,6 +1063,7 @@ struct TodoRowActions: View {
     @ObservedObject var store: TodoStore
     @ObservedObject var settings: AppSettings
     let showSettings: () -> Void
+    let edit: () -> Void
     var isCompleted = false
     var hasReminder = false
 
@@ -1076,40 +1074,57 @@ struct TodoRowActions: View {
         HStack(spacing: 4) {
             if !isCompleted {
                 Menu {
-                    Button(AppStrings.reminderIn15Minutes(settings.language)) {
-                        store.updateReminder(for: item, reminderDate: Date().addingTimeInterval(15 * 60))
-                    }
-                    Button(AppStrings.reminderIn30Minutes(settings.language)) {
-                        store.updateReminder(for: item, reminderDate: Date().addingTimeInterval(30 * 60))
-                    }
-                    Button(AppStrings.reminderIn1Hour(settings.language)) {
-                        store.updateReminder(for: item, reminderDate: Date().addingTimeInterval(60 * 60))
-                    }
-
-                    Divider()
-
-                    Button(AppStrings.custom(settings.language)) {
-                        customReminderDate = item.reminderDate ?? Date().addingTimeInterval(30 * 60)
-                        showingCustomReminder = true
-                    }
-
-                    if hasReminder {
-                        Divider()
-                        Button(AppStrings.clearReminder(settings.language)) {
-                            store.updateReminder(for: item, reminderDate: nil)
+                    Button(role: .destructive) {
+                        withAnimation(.easeOut(duration: 0.14)) {
+                            store.delete(item)
                         }
+                    } label: {
+                        Label(AppStrings.delete(settings.language), systemImage: "trash")
                     }
 
+                    Button {
+                        edit()
+                    } label: {
+                        Label(AppStrings.edit(settings.language), systemImage: "pencil")
+                    }
+
+                    Menu {
+                        Button(AppStrings.reminderIn15Minutes(settings.language)) {
+                            store.updateReminder(for: item, reminderDate: Date().addingTimeInterval(15 * 60))
+                        }
+                        Button(AppStrings.reminderIn30Minutes(settings.language)) {
+                            store.updateReminder(for: item, reminderDate: Date().addingTimeInterval(30 * 60))
+                        }
+                        Button(AppStrings.reminderIn1Hour(settings.language)) {
+                            store.updateReminder(for: item, reminderDate: Date().addingTimeInterval(60 * 60))
+                        }
+
+                        Divider()
+
+                        Button(AppStrings.custom(settings.language)) {
+                            customReminderDate = item.reminderDate ?? Date().addingTimeInterval(30 * 60)
+                            showingCustomReminder = true
+                        }
+
+                        if hasReminder {
+                            Divider()
+                            Button(AppStrings.clearReminder(settings.language)) {
+                                store.updateReminder(for: item, reminderDate: nil)
+                            }
+                        }
+                    } label: {
+                        Label(AppStrings.reminder(settings.language), systemImage: hasReminder ? "bell.fill" : "bell.badge")
+                    }
                 } label: {
-                    Image(systemName: hasReminder ? "bell.fill" : "bell.badge")
+                    Image(systemName: "ellipsis")
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(hasReminder ? PanelPalette.amber : PanelPalette.secondaryInk)
-                        .frame(width: 26, height: 26)
-                        .background(hasReminder ? PanelPalette.amber.opacity(0.15) : .clear)
-                        .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+                        .foregroundStyle(PanelPalette.secondaryInk)
+                        .frame(width: 28, height: 28)
+                        .background(Color(nsColor: .textBackgroundColor).opacity(0.75))
+                        .clipShape(Circle())
                 }
                 .menuStyle(.borderlessButton)
-                .help(AppStrings.setReminder(settings.language))
+                .help(AppStrings.moreActions(settings.language))
                 .popover(isPresented: $showingCustomReminder, arrowEdge: .trailing) {
                     CustomReminderPopoverView(
                         reminderDate: $customReminderDate,
@@ -1123,20 +1138,20 @@ struct TodoRowActions: View {
                         }
                     )
                 }
-            }
-
-            Button {
-                withAnimation(.easeOut(duration: 0.14)) {
-                    store.delete(item)
+            } else {
+                Button {
+                    withAnimation(.easeOut(duration: 0.14)) {
+                        store.delete(item)
+                    }
+                } label: {
+                    Image(systemName: "trash")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(PanelPalette.secondaryInk)
+                        .frame(width: 26, height: 26)
                 }
-            } label: {
-                Image(systemName: "trash")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(PanelPalette.secondaryInk)
-                    .frame(width: 26, height: 26)
+                .buttonStyle(.plain)
+                .help(AppStrings.delete(settings.language))
             }
-            .buttonStyle(.plain)
-            .help(AppStrings.delete(settings.language))
         }
     }
 }

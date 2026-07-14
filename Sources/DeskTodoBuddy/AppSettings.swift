@@ -258,6 +258,18 @@ enum AppStrings {
         language == .chinese ? "设置提醒" : "Set reminder"
     }
 
+    static func reminder(_ language: AppLanguage) -> String {
+        language == .chinese ? "提醒" : "Reminder"
+    }
+
+    static func edit(_ language: AppLanguage) -> String {
+        language == .chinese ? "编辑" : "Edit"
+    }
+
+    static func moreActions(_ language: AppLanguage) -> String {
+        language == .chinese ? "更多操作" : "More actions"
+    }
+
     static func delete(_ language: AppLanguage) -> String {
         language == .chinese ? "删除" : "Delete"
     }

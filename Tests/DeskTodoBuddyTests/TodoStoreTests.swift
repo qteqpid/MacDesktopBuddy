@@ -77,6 +77,19 @@ final class TodoStoreTests: XCTestCase {
         XCTAssertFalse(AppPreferences.remindedTodoIDs.contains(item.id))
     }
 
+    func testUpdateTitleTrimsAndIgnoresEmptyInput() throws {
+        let store = TodoStore()
+        store.add(title: "原始标题", reminderDate: nil)
+        let item = try XCTUnwrap(store.items.first)
+
+        store.updateTitle(for: item, title: "  新标题  ")
+        XCTAssertEqual(store.items.first?.title, "新标题")
+
+        let updated = try XCTUnwrap(store.items.first)
+        store.updateTitle(for: updated, title: "   ")
+        XCTAssertEqual(store.items.first?.title, "新标题")
+    }
+
     func testDueItemsExcludeCompletedItemsAndFutureReminders() throws {
         let now = Date()
         let store = TodoStore()
