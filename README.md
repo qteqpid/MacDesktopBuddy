@@ -6,7 +6,7 @@
 
 ### 常驻 macOS 桌面的可爱待办小工具
 
-**桌面小Q · 待办提醒 · 休息提醒 · 语音输入 · 数据只留在本机**
+**桌面伙伴 · 待办提醒 · 休息提醒 · 语音输入 · 自定义头像与名字 · 数据只留在本机**
 
 ### [官网与下载页 →](https://qteqpid.github.io/app-web/mac-desktop-buddy/index.html)
 
@@ -31,6 +31,7 @@
 - 休息提醒：按固定间隔弹出温馨提醒，帮助你从长时间工作里停一下。
 - 语音输入：使用 macOS 语音识别把中英文夹杂的口述内容转成待办。
 - 隐身模式：右键或长按小Q选择隐身，之后可从菜单栏入口恢复。
+- 个性化：可在设置页自定义桌面头像、面板头像和显示名称，也可一键恢复默认企鹅头像。
 - 设置：支持薄荷绿/樱花粉主题，以及中文/英文面板语言。
 - 本地保存：待办数据保存在本机，不依赖后端服务。
 
@@ -70,6 +71,12 @@ MacDesktopBuddy 使用以下系统能力：
 
 ```text
 ~/Library/Application Support/DeskTodoBuddy/todos.json
+```
+
+自定义头像会复制并保存为本机文件：
+
+```text
+~/Library/Application Support/DeskTodoBuddy/custom-logo.png
 ```
 
 设置项保存在 `UserDefaults`。当前项目没有后端服务，也没有上传待办内容的代码路径。
@@ -161,6 +168,7 @@ MacDesktopBuddy is a small macOS desktop companion for todos, task reminders, an
 - Break reminders: warm rest prompts at a configurable interval.
 - Voice input: macOS Speech recognition for Chinese-first dictation with mixed English terms.
 - Hide mode: hide Q from the desktop via right-click or long-press, then restore it from the menu bar.
+- Personalization: customize the desktop icon, panel avatar, and display name from Settings; reset restores the default penguin avatar.
 - Settings: Mint Green / Sakura Pink themes and Chinese / English panel language.
 - Local-first storage: todos are stored locally with no backend service.
 
@@ -200,6 +208,12 @@ Todo data is stored locally at:
 
 ```text
 ~/Library/Application Support/DeskTodoBuddy/todos.json
+```
+
+Custom avatar images are copied and stored locally at:
+
+```text
+~/Library/Application Support/DeskTodoBuddy/custom-logo.png
 ```
 
 Settings are stored in `UserDefaults`. The app has no backend service and no code path that uploads todo content.
